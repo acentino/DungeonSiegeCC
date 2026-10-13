@@ -63,7 +63,7 @@ def apply_update(source, target, previous_pid=None):
         for name in names:
             (target / name).with_name(Path(name).name + ".dscc-new").unlink(missing_ok=True)
     # Leave staging intact for diagnostics if a failure occurs; otherwise remove.
-    if source.name.startswith("dscc_stage_"):
+    if source.name == "staged" and source.parent.name.startswith("dscc_stage_"):
         shutil.rmtree(source.parent, ignore_errors=True)
     return len(replaced)
 
