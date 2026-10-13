@@ -1,6 +1,6 @@
 DungeonSiegeCC framework bootstrap v0.2.0
 
-This is a persistent, versioned framework scaffold, not yet a functioning
+This is a persistent, versioned framework *scaffold*, not yet a functioning
 Dungeon Siege II engine integration or a playable companion mod.
 
 The installer places these managed files in <game>/DungeonSiegeCC/ and checks
