@@ -1,15 +1,16 @@
 name: Publish Windows source release
+
 on:
   push:
+    branches: [main]
+    paths:
+      - RELEASE_VERSION
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release tag, e.g. v0.3.0'
-        required: true
-        type: string
+
 permissions:
   contents: write
+
 jobs:
   release:
     runs-on: windows-latest
@@ -18,25 +19,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Validate source and tests
-        run: |
-          python -m py_compile importer.py manager.py update_helper.py
-          python -m unittest discover -s tests -v
-      - name: Package offline-first application
+      - name: Verify version and run regression tests
         shell: python
         run: |
-          import pathlib, zipfile
-          root = pathlib.Path('.')
-          names = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "START_WINDOWS.bat", "README.md"]
-          names += [str(p).replace("\\", "/") for p in pathlib.Path("framework_bundle").rglob("*") if p.is_file()]
+          import os
+          from pathlib import Path
+          import manager
+          release_tag = Path("RELEASE_VERSION").read_text(encoding="utf-8").strip()
+          assert release_tag == "v" + manager.VERSION, (release_tag, manager.VERSION)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              pass
+      - name: Validate application source
+        run: |
+          python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py
+          python -m unittest discover -s tests -v
+          python -c "import manager; manager.bundled_manifest(); print('Framework bundle checksum verified')"
+      - name: Package offline-first Windows source application
+        shell: python
+        run: |
+          from pathlib import Path
+          import zipfile
+          files = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "START_WINDOWS.bat", "README.md"]
+          files += [p.as_posix() for p in Path("framework_bundle").rglob("*") if p.is_file()]
           with zipfile.ZipFile("DungeonSiegeCC-Windows.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-              for name in names:
-                  archive.write(name)
-          print("Packaged", len(names), "files")
-      - name: Publish GitHub Release
+              for file in files:
+                  archive.write(file)
+          print("Packaged", len(files), "files")
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: v0.3.1
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: DungeonSiegeCC-Windows.zip
