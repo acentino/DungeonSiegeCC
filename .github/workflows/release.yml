@@ -31,7 +31,7 @@ jobs:
           assert release_tag == "v" + manager.VERSION, (release_tag, manager.VERSION)
       - name: Validate application source
         run: |
-          python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py
+          python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py
           python -m unittest discover -s tests -v
           python -c "import manager; manager.bundled_manifest(); print('Framework bundle checksum verified')"
       - name: Package offline-first Windows source application
@@ -39,7 +39,7 @@ jobs:
         run: |
           from pathlib import Path
           import zipfile
-          files = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "START_WINDOWS.bat", "README.md"]
+          files = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "START_WINDOWS.bat", "README.md"]
           files += [p.as_posix() for p in Path("framework_bundle").rglob("*") if p.is_file()]
           with zipfile.ZipFile("DungeonSiegeCC-Windows.zip", "w", zipfile.ZIP_DEFLATED) as archive:
               for file in files:
@@ -48,7 +48,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.2
+          tag_name: v0.3.3
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: DungeonSiegeCC-Windows.zip
