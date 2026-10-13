@@ -266,20 +266,30 @@ class App(tk.Tk):
                 path.parent.mkdir(parents=True,exist_ok=True)
                 path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
                 def finish():
-                    candidates=report["potential_recruitable"]
+                    candidates=report["donor_candidates"]
+                    diagnostics=report["diagnostics"]
                     summary=(f"GAS files: {report['gas_file_count']}\n"
                              f"Templates: {report['template_count']}\n"
-                             f"Potential hireable templates: {report['potential_recruitable_count']}\n"
+                             f"base_pm-derived matches: {report['potential_recruitable_count']}\n"
+                             f"Other donor prospects: {report['donor_candidate_count']}\n"
+                             f"Unresolved parent links: {diagnostics['unresolved_specialization_count']}\n"
                              f"Report: {path}\n\n")
                     if not candidates:
-                        self.status.set("No base_pm-derived donor candidates detected in archive.")
-                        messagebox.showwarning("Logic reference analysis",summary+
-                            "No base_pm-derived donor candidates detected. This may depend on base templates stored in other files.")
+                        example=diagnostics.get("template_examples_if_no_match",[])
+                        summary+="No likely actor donors found with the current heuristics.\n"
+                        if example:
+                            summary+="Available template examples:\n"+"\n".join(
+                                f"{x['template']} -> {x['specializes'] or '(root)'}"
+                                for x in example[:15])
+                        summary+="\n\nThe full report includes missing parent names and template paths."
+                        self.status.set("Logic analysis completed; inspect report for template lineage.")
+                        messagebox.showwarning("Logic reference analysis",summary)
                         return
-                    summary+="Examples:\n"+"\n".join(
-                        f"{x['template']}: {x['screen_name'] or '(unnamed)'}"
-                        for x in candidates[:18])
-                    summary+="\n\nEnter a donor template ID below, or Cancel to keep the current selection."
+                    summary+="Possible donor templates (not confirmed recruitable):\n"+"\n".join(
+                        f"{x['template']} — {x['screen_name'] or '(unnamed)'} "
+                        f"[score {x['donor_score']}: {', '.join(x['donor_reasons'][:3])}]"
+                        for x in candidates[:15])
+                    summary+="\n\nEnter a donor template ID, or Cancel to leave it unchanged."
                     chosen=simpledialog.askstring("Logic template candidates",summary,
                         initialvalue=candidates[0]["template"])
                     if not chosen:
