@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-FILES = ("importer.py", "manager.py", "update_helper.py", "README.md", "START_WINDOWS.bat")
+FILES = ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "README.md", "START_WINDOWS.bat")
 OPTIONAL = ("updater.py",)
 
 def wait_for_exit(pid, seconds=30):
