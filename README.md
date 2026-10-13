@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.3
+# DungeonSiegeCC — development source v0.3.4
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,41 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Deep local Tank inspection and selective reference extraction (v0.3.4)
+
+This release introduces a **read-only DS2 Tank parser** (`ds2_tank.py`),
+which inspects the actual contents of `Logic.ds2res` and
+`Objects.ds2res` on the user's computer. The previous header-only scan
+is enhanced with local file counts and examples of GAS, ASP, and PRS
+filenames; the JSON report remains under
+`%APPDATA%\\DungeonSiegeCC\\local_asset_report.json`.
+
+Use **Extract Logic GAS/Skrit** to create a new reference directory containing
+the scripts and templates from your own game. The importer selects that
+directory for donor-template lookup. Use **Extract filtered ASP/PRS** to
+extract only model/animation resources whose internal path contains the term
+you enter (for example, `hero`, `female`, `fs0`). If you are unsure of
+the names, inspect local archives first and check example paths in the JSON.
+Each extraction gets a new output directory and a report of skipped entries.
+
+Currently supported payload formats: **uncompressed and zlib/deflate**,
+including chunked zlib. **LZO is not yet supported**, and those files are
+reported as failures instead of writing bogus asset data. The parser has been
+tested using synthetic DSg2 tank fixtures. It has **not** been validated
+against every production Dungeon Siege II tank variant, so do not infer
+game compatibility from the automated tests. No game-owned resource archive,
+asset, texture, or MMD character file is added to this public repository.
+
+Manual CLI (Windows PowerShell):
+
+```powershell
+py -3 ds2_tank.py "C:\\Games\\Dungeon Siege II\\Resources\\Logic.ds2res" --index
+py -3 ds2_tank.py "C:\\Games\\Dungeon Siege II\\Resources\\Logic.ds2res" --extract-to "C:\\DSCC\\LogicReferences" --suffix .gas
+```
+
+The archive reader is a **reference-extraction milestone**, not the actual
+ASP skin exporter, PRS retargeter, or recruitable-NPC game runtime.
 
 ## Local archive inspection and importing a character ZIP (v0.3.3)
 
@@ -84,7 +119,7 @@ At startup and when manually requested, the source installer checks the latest G
 ## Automated tests
 
 ```powershell
-py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py
+py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py
 py -3 -m unittest discover -s tests -v
 ```
 
