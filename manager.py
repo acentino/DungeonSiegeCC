@@ -9,7 +9,7 @@ import urllib.error
 import zipfile
 from pathlib import Path
 
-VERSION = "0.3.5"
+VERSION = "0.3.6"
 REPO = "acentino/DungeonSiegeCC"
 FRAMEWORK_DIR = "DungeonSiegeCC"
 
