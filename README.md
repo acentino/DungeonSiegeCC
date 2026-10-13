@@ -31,7 +31,7 @@ The export's `GAME_BUILD_REQUIREMENTS.json` enumerates remaining engine work: mo
 
 The source installer checks the latest GitHub Release and offers an **opt-in** download of its `DungeonSiegeCC-Windows.zip` release asset when newer. It stages a validated archive and replaces only application files after exit, leaving profiles, game data and installed characters untouched. The `.github/workflows/release.yml` workflow can publish a source release when a `v*` tag is pushed or when triggered manually with a version.
 
-**Privacy limitation:** The repository is currently **private**. Anonymous release queries cannot see it. For your private development environment, optionally configure the read-only environment variable `DUNGEONSIEGECC_GITHUB_TOKEN` (do not commit or embed a token). Public releases should be distributed from a public repository; the GUI does not bypass GitHub permissions. Packaged-EXE updates are not implemented.
+**Public repository:** No GitHub token is required to check or download public releases. Updates require a published GitHub Release containing `DungeonSiegeCC-Windows.zip`; a commit on `main` alone does not trigger an update prompt. To publish a new release, update `manager.VERSION`, `RELEASE_VERSION` and the release workflow tag together. Packaged-EXE updates are not implemented.
 
 ## Automated tests
 
