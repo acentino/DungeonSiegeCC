@@ -51,7 +51,7 @@ class UpdatesTests(unittest.TestCase):
         target = self.root / "app"
         stage.mkdir()
         target.mkdir()
-        for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "ds2_tank.py"):
+        for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "ds2_tank.py", "logic_inspector.py"):
             (stage / name).write_text("new", encoding="utf-8")
             (target / name).write_text("old", encoding="utf-8")
         (stage / "framework_bundle").mkdir()
