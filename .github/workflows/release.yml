@@ -27,8 +27,6 @@ jobs:
           import manager
           release_tag = Path("RELEASE_VERSION").read_text(encoding="utf-8").strip()
           assert release_tag == "v" + manager.VERSION, (release_tag, manager.VERSION)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              pass
       - name: Validate application source
         run: |
           python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py
