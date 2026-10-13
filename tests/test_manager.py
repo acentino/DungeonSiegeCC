@@ -34,6 +34,14 @@ class ManagerTests(unittest.TestCase):
     def test_bad_bundle_hash(self):
         (self.bundle/"core.txt").write_text("tampered")
         with self.assertRaises(ValueError):manager.install_framework(self.game,self.bundle)
+    def test_real_bundled_framework_integrity(self):
+        manager.bundled_manifest()
+
+    def test_public_release_header_has_no_token(self):
+        from unittest.mock import patch
+        with patch.dict("os.environ", {"DUNGEONSIEGECC_GITHUB_TOKEN": "", "GITHUB_TOKEN": "unrelated"}, clear=False):
+            self.assertNotIn("Authorization", manager._github_headers())
+
     def test_settings(self):
         config=self.root/"settings.json"
         manager.save_settings({"game_path":"X"},config)
