@@ -214,12 +214,14 @@ class Tank:
                 raise TankError("Decompressed content is truncated")
             return bytes(result)
 
-    def extract(self, destination, suffixes=(".gas", ".skrit", ".asp", ".prs"), max_files=10000):
+    def extract(self, destination, suffixes=(".gas", ".skrit", ".asp", ".prs"), max_files=10000, contains=None):
         """Writes only requested types beneath a new destination; never overwrites."""
         destination = Path(destination)
         if destination.exists():
             raise FileExistsError("Destination already exists: " + str(destination))
         entries = self.list_files(suffixes)
+        if contains:
+            entries = [e for e in entries if contains.casefold() in e.path.casefold()]
         if len(entries) > max_files:
             raise TankError("Too many matching files; use a narrower extension filter")
         if sum(e.size for e in entries) > MAX_EXTRACT_SIZE:
@@ -253,6 +255,45 @@ class Tank:
                 "asp_examples": [e.path for e in self.list_files((".asp",))[:20]],
                 "prs_examples": [e.path for e in self.list_files((".prs",))[:20]]}
 
+
+def game_inventory(game_dir):
+    """Deep-inspect local Logic and Objects tanks without extracting resources."""
+    root = Path(game_dir)
+    candidates = (root / "Resources", root / "resources", root)
+    resources = next((p for p in candidates if p.is_dir() and
+        any(f.suffix.lower() == ".ds2res" for f in p.iterdir() if f.is_file())), None)
+    if resources is None:
+        raise TankError("No Dungeon Siege II .ds2res files found")
+    report = {"resources": str(resources), "archives": {}}
+    for name in ("Logic.ds2res", "Objects.ds2res"):
+        path = next((p for p in resources.iterdir() if p.name.lower() == name.lower()), None)
+        if path is None:
+            report["archives"][name] = {"error": "Archive not found"}
+            continue
+        try:
+            report["archives"][name] = Tank(path).inventory()
+        except (TankError, OSError, struct.error) as e:
+            report["archives"][name] = {"error": str(e)}
+    return report
+
+
+def extract_game_references(game_dir, output, kind, contains=None):
+    """Extract logic GAS/Skrit, or filtered Objects ASP/PRS, into a new folder."""
+    if kind not in ("logic", "objects"):
+        raise TankError("Select logic or objects references")
+    report = game_inventory(game_dir)
+    resources = Path(report["resources"])
+    tank_name = "Logic.ds2res" if kind == "logic" else "Objects.ds2res"
+    path = next((x for x in resources.iterdir() if x.name.lower() == tank_name.lower()), None)
+    if path is None:
+        raise TankError(tank_name + " not found")
+    if kind == "objects" and not contains:
+        raise TankError("Use a non-empty filename filter when extracting potentially large model archives")
+    tank = Tank(path)
+    return tank.extract(output,
+                        (".gas", ".skrit") if kind == "logic" else (".asp", ".prs"),
+                        max_files=20000,
+                        contains=contains)
 
 def main():
     p = argparse.ArgumentParser(description="Local DS2 Tank index/extractor (raw/zlib)")
