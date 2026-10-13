@@ -174,6 +174,49 @@ def load_templates(source):
     return templates, gas_files
 
 
+
+# Screening signals, not proof an actor can join the player's party.
+# DS2's inheritance and dialogue scripts vary across game resources.
+ACTOR_DIR = re.compile(r"(?:^|/)(?:actors|characters|mercenaries|companions)(?:/|$)", re.I)
+GOOD_DIR = re.compile(r"(?:^|/)(?:good|friendly|heroes|party|hirelings|mercenaries)(?:/|$)", re.I)
+STRONG_HIRE = re.compile(r"(?:hire|recruit|companion|party_member|mercenary|henchman|follower)", re.I)
+NPC_NAME = re.compile(r"(?:human|npc|fighter|warrior|mage|ranger|hero|actor|character|farmer|town|villager)", re.I)
+
+
+def rank_donor(item, chain):
+    """Return a transparent compatibility score, not a recruitability claim."""
+    filename = item.get("source_file", "").replace("\\\\", "/")
+    names = " ".join(chain)
+    score = 0
+    reasons = []
+    if ACTOR_DIR.search(filename):
+        score += 40
+        reasons.append("actor directory")
+    if GOOD_DIR.search(filename):
+        score += 20
+        reasons.append("friendly/human directory")
+    if any(BASE_PM.match(value) for value in chain):
+        score += 50
+        reasons.append("base_pm lineage")
+    if STRONG_HIRE.search(names):
+        score += 25
+        reasons.append("hire/party naming")
+    if NPC_NAME.search(names):
+        score += 8
+        reasons.append("NPC/human naming")
+    if item.get("can_sell_self_explicit", "").lower() in ("true", "1", "yes"):
+        score += 25
+        reasons.append("can_sell_self flag")
+    if item.get("talk_job"):
+        score += 12
+        reasons.append("dialogue job")
+    if item.get("screen_name"):
+        score += 6
+        reasons.append("display name")
+    return score, reasons
+
+
+
 def inspect_logic_source(source, max_candidates=300):
     templates, gas_files = load_templates(source)
 
@@ -192,14 +235,43 @@ def inspect_logic_source(source, max_candidates=300):
         return chain
 
     candidates = []
+    donor_candidates = []
+    missing_parents = {}
+    from collections import Counter
+    root_types = Counter()
     for item in templates.values():
         chain = lineage(item["template"])
-        if any(BASE_PM.match(part) for part in chain):
+        inherited = any(BASE_PM.match(part) for part in chain)
+        if inherited:
             candidate = dict(item)
             candidate["template_chain"] = chain
             candidate["recruitment_status"] = "candidate_only_not_in_game_verified"
             candidates.append(candidate)
+        score, reasons = rank_donor(item, chain)
+        parent = item.get("specializes", "")
+        if parent and parent.lower() not in templates:
+            missing_parents[parent] = missing_parents.get(parent, 0) + 1
+        root_types[chain[-1].lower() if chain else "(unknown)"] += 1
+        # Only actor-ish templates make reasonable donor prospects. Never
+        # automatically choose an arbitrary weapon/item template.
+        if score >= 35:
+            candidate = dict(item)
+            candidate["template_chain"] = chain
+            candidate["donor_score"] = score
+            candidate["donor_reasons"] = reasons
+            candidate["recruitment_status"] = "unverified_donor_candidate"
+            candidate["inheritance_complete"] = not bool(
+                parent and parent.lower() not in templates)
+            donor_candidates.append(candidate)
     candidates.sort(key=lambda x: (not bool(x["screen_name"]), x["template"].lower()))
+    donor_candidates.sort(key=lambda x: (-x["donor_score"], not bool(x["screen_name"]), x["template"].lower()))
+    # Include a small catalogue when the extraction is partial / nothing
+    # matches: the user needs actionable reference names and diagnostics.
+    fallback = sorted(
+        templates.values(),
+        key=lambda x: (not bool(ACTOR_DIR.search(x["source_file"].replace("\\\\", "/"))),
+                       not bool(x["screen_name"]), x["template"].lower()),
+    )[:min(max_candidates, 50)]
     return {
         "source_type": "zip" if Path(source).suffix.lower() == ".zip" else "folder",
         "gas_file_count": gas_files,
@@ -207,13 +279,32 @@ def inspect_logic_source(source, max_candidates=300):
         "potential_recruitable_count": len(candidates),
         "potential_recruitable": candidates[:max_candidates],
         "truncated_candidates": len(candidates) > max_candidates,
+        "donor_candidate_count": len(donor_candidates),
+        "donor_candidates": donor_candidates[:max_candidates],
+        "truncated_donor_candidates": len(donor_candidates) > max_candidates,
+        "diagnostics": {
+            "base_pm_templates_found": sum(bool(BASE_PM.match(x["template"])) for x in templates.values()),
+            "unresolved_specialization_count": sum(missing_parents.values()),
+            "unresolved_specialization_examples": [
+                {"template": name, "count": count}
+                for name, count in sorted(missing_parents.items(), key=lambda x: -x[1])[:30]],
+            "root_lineage_examples": [
+                {"root": name, "count": count}
+                for name, count in root_types.most_common(20)],
+            "template_examples_if_no_match": [
+                {"template": x["template"], "source_file": x["source_file"],
+                 "specializes": x["specializes"], "screen_name": x["screen_name"]}
+                for x in fallback
+            ] if not donor_candidates else [],
+        },
         "notes": [
-            "Candidates follow base_pm inheritance; this does not prove the NPC appears or is recruitable in a map.",
-            "No game-owned script bodies or character art are stored in this report.",
-            "NPC placement, dialogue, animation, and save-game persistence remain unverified.",
+            "base_pm lineage is only one possible convention, not a prerequisite for a DS2 actor.",
+            "Donor scores are inspection hints based on template paths/names/properties, NOT proof the game can recruit that NPC.",
+            "Missing base templates can prevent tracing a complete inheritance chain.",
+            "Game-owned GAS/Skrit bodies and character assets are excluded from this report.",
+            "NPC placement, dialogue, animation compatibility, and save-game persistence remain unverified.",
         ],
     }
-
 
 def verify_donor_in_source(source, template):
     if not re.fullmatch(r"[a-z_][a-z0-9_]{0,63}", template, re.I):
