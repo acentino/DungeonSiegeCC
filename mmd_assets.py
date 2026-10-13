@@ -201,6 +201,20 @@ def export_obj(pmx_file, destination):
                 tex=data['textures'][t].replace('\\','/')
                 if '..' not in Path(tex).parts and not Path(tex).is_absolute():
                     f.write('map_Kd '+tex.replace('\n','')+'\n')
+    # Only copy textures beneath the model directory, never external paths.
+    model_root=Path(pmx_file).resolve().parent
+    for tex in data['textures']:
+        name=tex.replace('\\','/')
+        relative=Path(name)
+        if not name or relative.is_absolute() or '..' in relative.parts:
+            continue
+        source=(model_root/relative).resolve()
+        if not source.is_file() or not source.is_relative_to(model_root):
+            continue
+        dest_tex=dest.parent/relative
+        dest_tex.parent.mkdir(parents=True,exist_ok=True)
+        from shutil import copyfile
+        copyfile(source,dest_tex)
     bones_file=dest.with_suffix('.bones.json')
     bones_file.write_text(json.dumps({'model':data['name'],'bones':data['bones']},ensure_ascii=False,indent=2),encoding='utf-8')
     return {'obj':str(dest),'mtl':str(mtl),'bones':str(bones_file),
