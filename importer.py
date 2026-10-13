@@ -266,30 +266,34 @@ class App(tk.Tk):
                 path.parent.mkdir(parents=True,exist_ok=True)
                 path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
                 def finish():
-                    candidates=report["donor_candidates"]
+                    candidates=report["humanoid_candidates"]
                     diagnostics=report["diagnostics"]
                     summary=(f"GAS files: {report['gas_file_count']}\n"
                              f"Templates: {report['template_count']}\n"
                              f"base_pm-derived matches: {report['potential_recruitable_count']}\n"
-                             f"Other donor prospects: {report['donor_candidate_count']}\n"
+                             f"All actor donor prospects: {report['donor_candidate_count']}\n"
+                             f"Humanoid/known companion leads: {report['humanoid_candidate_count']}\n"
+                             f"Non-humanoid/hostile matches excluded: {report['excluded_non_humanoid_count']}\n"
                              f"Unresolved parent links: {diagnostics['unresolved_specialization_count']}\n"
                              f"Report: {path}\n\n")
                     if not candidates:
                         example=diagnostics.get("template_examples_if_no_match",[])
-                        summary+="No likely actor donors found with the current heuristics.\n"
+                        summary+="No plausible humanoid donors identified automatically.\n"
                         if example:
                             summary+="Available template examples:\n"+"\n".join(
                                 f"{x['template']} -> {x['specializes'] or '(root)'}"
                                 for x in example[:15])
-                        summary+="\n\nThe full report includes missing parent names and template paths."
+                        summary+="\n\nPlease share logic_template_report.json for manual review.\n"
+                        summary+="Do not select a giant, beast, ghost, or monster as a normal humanoid rig donor."
                         self.status.set("Logic analysis completed; inspect report for template lineage.")
                         messagebox.showwarning("Logic reference analysis",summary)
                         return
-                    summary+="Possible donor templates (not confirmed recruitable):\n"+"\n".join(
+                    summary+="Humanoid/vanilla companion REFERENCE leads (not validated rigs):\n"+"\n".join(
                         f"{x['template']} — {x['screen_name'] or '(unnamed)'} "
-                        f"[score {x['donor_score']}: {', '.join(x['donor_reasons'][:3])}]"
+                        f"[{x['compatibility_category']}; {', '.join(x['compatibility_reasons'][:2])}]"
                         for x in candidates[:15])
-                    summary+="\n\nEnter a donor template ID, or Cancel to leave it unchanged."
+                    summary+="\n\nNo donor is verified compatible with Dalvi yet.\n"
+                    summary+="Enter a template ID for inspection, or Cancel to leave it unchanged."
                     chosen=simpledialog.askstring("Logic template candidates",summary,
                         initialvalue=candidates[0]["template"])
                     if not chosen:
@@ -300,6 +304,14 @@ class App(tk.Tk):
                     except logic_inspector.LogicAnalysisError as exc:
                         messagebox.showerror("Invalid donor selection",str(exc))
                         return
+                    if not any(x["template"].casefold()==donor["template"].casefold()
+                               for x in candidates):
+                        if not messagebox.askyesno(
+                                "Unverified donor template",
+                                "This template was not classified as a humanoid donor. "
+                                "It may be a beast or monster with an incompatible skeleton. "
+                                "Select it for reference inspection anyway?"):
+                            return
                     self.vars["donor_template"].set(donor["template"])
                     self.vars["donor_root"].set(archive)
                     self.status.set(f"Selected donor {donor['template']} from Logic ZIP. No game files modified.")
