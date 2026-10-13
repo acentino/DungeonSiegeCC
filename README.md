@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.5
+# DungeonSiegeCC — development source v0.3.6
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,27 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Logic donor discovery with zero base_pm matches (v0.3.6)
+
+The original analyzer only counted templates inheriting from `base_pm`.
+An extracted Logic archive can contain thousands of valid templates without
+any `base_pm`-derived entries; **0 matches did not mean 0 usable actors**.
+
+Re-analyzing the same ZIP now provides two separate categories:
+- `potential_recruitable`: `base_pm` lineage matches, retained for
+  compatibility. These were never confirmed recruitable in-game.
+- `donor_candidates`: scored actor-template prospects inferred from the GAS
+  file path (`actors/good`, `characters` etc.), ancestry names, dialogue
+  jobs, displayed names and `can_sell_self` properties. Each includes
+  `donor_score`, explanatory `donor_reasons`, and ancestor-chain metadata.
+
+The expanded `logic_template_report.json` also contains diagnostic samples
+for missing specializations and root ancestry. If no actor-like template is
+identified, it shows the template examples and missing parents rather than
+claiming that the archive contains no NPCs. Scores are **heuristics**, not
+evidence of functioning recruitment. You can still manually enter any
+verified donor template ID from the archive.
 
 ## Direct Logic reference ZIP analysis (v0.3.5)
 
