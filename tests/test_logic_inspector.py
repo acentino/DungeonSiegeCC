@@ -51,6 +51,42 @@ class TestLogicInspector(unittest.TestCase):
         self.assertIn("base_pm_fg", candidates["dalvi_donor"]["template_chain"])
         self.assertNotIn("other_actor", candidates)
 
+    def test_actor_donors_without_base_pm(self):
+        """Regression for real scans showing 0 base_pm matches."""
+        sample = """
+[t:template,n:base_villager] { [common] { screen_name = "Village Base"; } }
+[t:template,n:vendor_donor] {
+    specializes = base_villager;
+    [common] { screen_name = "Friendly Villager"; }
+    [mind] { jat_talk = "world/ai/jobs/talk.skrit"; }
+}
+[t:template,n:lost_actor] {
+    specializes = missing_game_base;
+    [common] { screen_name = "Unknown Ancestor"; }
+}
+"""
+        path=self.root/"no_base_pm.zip"
+        with zipfile.ZipFile(path,"w",zipfile.ZIP_DEFLATED) as z:
+            z.writestr("world/contentdb/templates/regular/actors/good/villagers.gas",sample)
+            z.writestr("world/contentdb/templates/regular/items/weapons.gas",
+                       "[t:template,n:sword] { specializes = weapon_base; }")
+        report=lib.inspect_logic_source(path)
+        self.assertEqual(report["potential_recruitable_count"],0)
+        self.assertGreaterEqual(report["donor_candidate_count"],2)
+        donors={item["template"]:item for item in report["donor_candidates"]}
+        self.assertIn("vendor_donor",donors)
+        self.assertIn("actor directory",donors["vendor_donor"]["donor_reasons"])
+        self.assertNotIn("sword",donors)
+        self.assertFalse(donors["lost_actor"]["inheritance_complete"])
+        self.assertGreater(report["diagnostics"]["unresolved_specialization_count"],0)
+
+    def test_windows_archive_paths_match_actor_directory(self):
+        item={"source_file":r"world\\contentdb\\templates\\regular\\actors\\good\\town.gas",
+              "screen_name":"Town Friend","talk_job":"","can_sell_self_explicit":""}
+        score, reasons=lib.rank_donor(item,["town_friend"])
+        self.assertGreaterEqual(score,60)
+        self.assertIn("actor directory",reasons)
+
     def test_donor_validation(self):
         item = lib.verify_donor_in_source(self.zip, "dalvi_donor")
         self.assertEqual(item["screen_name"], "Dalvi")
