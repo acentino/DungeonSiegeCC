@@ -7,6 +7,7 @@ import mmd_assets
 import game_pipeline
 import asset_probe
 import ds2_tank
+import logic_inspector
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
@@ -101,6 +102,7 @@ class App(tk.Tk):
         inspectbar=ttk.Frame(root);inspectbar.pack(fill="x")
         ttk.Button(inspectbar,text="Inspect MMD model",command=self.inspect_model).pack(side="left",padx=3)
         ttk.Button(inspectbar,text="Inspect VMD overrides",command=self.inspect_motion).pack(side="left",padx=3)
+        ttk.Button(inspectbar,text="Analyze Logic reference ZIP",command=self.inspect_logic_zip).pack(side="left",padx=3)
         info=ttk.LabelFrame(root,text="Companion",padding=8);info.pack(fill="x");info.columnconfigure(1,weight=1)
         for i,(key,title) in enumerate([("name","Name"),("identifier","Unique ID"),("model","MMD model (.pmx/.pmd)"),("class_note","Class"),("recruitment_dialogue","Recruitment dialogue"),("spawn_note","Spawn location note"),("donor_template","DS2 donor actor ID"),("donor_root","Extracted Logic GAS folder")]):
             ttk.Label(info,text=title).grid(row=i,column=0,sticky="w")
@@ -248,6 +250,54 @@ class App(tk.Tk):
             except Exception as exc:
                 reports.append(f"{slot}: ERROR — {exc}")
         messagebox.showinfo("VMD motion inspection","\\n".join(reports).replace("\\\\n","\\n"))
+
+    def inspect_logic_zip(self):
+        """Analyze user-owned GAS templates inside a ZIP without unpacking them."""
+        archive=filedialog.askopenfilename(title="Choose the extracted Logic references ZIP",
+            filetypes=[("Extracted Logic archive","*.zip")])
+        if not archive:
+            return
+        self.status.set("Reading recruitable template inheritance from Logic ZIP...")
+        import threading
+        def worker():
+            try:
+                report=logic_inspector.inspect_logic_source(archive)
+                path=manager.settings_path().parent/"logic_template_report.json"
+                path.parent.mkdir(parents=True,exist_ok=True)
+                path.write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding="utf-8")
+                def finish():
+                    candidates=report["potential_recruitable"]
+                    summary=(f"GAS files: {report['gas_file_count']}\n"
+                             f"Templates: {report['template_count']}\n"
+                             f"Potential hireable templates: {report['potential_recruitable_count']}\n"
+                             f"Report: {path}\n\n")
+                    if not candidates:
+                        self.status.set("No base_pm-derived donor candidates detected in archive.")
+                        messagebox.showwarning("Logic reference analysis",summary+
+                            "No base_pm-derived donor candidates detected. This may depend on base templates stored in other files.")
+                        return
+                    summary+="Examples:\n"+"\n".join(
+                        f"{x['template']}: {x['screen_name'] or '(unnamed)'}"
+                        for x in candidates[:18])
+                    summary+="\n\nEnter a donor template ID below, or Cancel to keep the current selection."
+                    chosen=simpledialog.askstring("Logic template candidates",summary,
+                        initialvalue=candidates[0]["template"])
+                    if not chosen:
+                        self.status.set("Logic reference report saved; donor unchanged.")
+                        return
+                    try:
+                        donor=logic_inspector.verify_donor_in_source(archive,chosen.strip())
+                    except logic_inspector.LogicAnalysisError as exc:
+                        messagebox.showerror("Invalid donor selection",str(exc))
+                        return
+                    self.vars["donor_template"].set(donor["template"])
+                    self.vars["donor_root"].set(archive)
+                    self.status.set(f"Selected donor {donor['template']} from Logic ZIP. No game files modified.")
+                self.after(0,finish)
+            except Exception as error:
+                msg=str(error)
+                self.after(0,lambda:messagebox.showerror("Logic ZIP analysis failed",msg))
+        threading.Thread(target=worker,daemon=True).start()
 
     def browse_donor_root(self):
         folder=filedialog.askdirectory(title="Folder of untanked Dungeon Siege II Logic.ds2res GAS files")
