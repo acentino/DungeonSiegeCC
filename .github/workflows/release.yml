@@ -1,0 +1,42 @@
+name: Publish Windows source release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag, e.g. v0.3.0'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate source and tests
+        run: |
+          python -m py_compile importer.py manager.py update_helper.py
+          python -m unittest discover -s tests -v
+      - name: Package offline-first application
+        shell: python
+        run: |
+          import pathlib, zipfile
+          root = pathlib.Path('.')
+          names = ["importer.py", "manager.py", "update_helper.py", "START_WINDOWS.bat", "README.md"]
+          names += [str(p).replace("\\", "/") for p in pathlib.Path("framework_bundle").rglob("*") if p.is_file()]
+          with zipfile.ZipFile("DungeonSiegeCC-Windows.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+              for name in names:
+                  archive.write(name)
+          print("Packaged", len(names), "files")
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: DungeonSiegeCC-Windows.zip
