@@ -39,7 +39,7 @@ jobs:
         run: |
           from pathlib import Path
           import zipfile
-          files = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "START_WINDOWS.bat", "README.md"]
+          files = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "ds2_tank.py", "START_WINDOWS.bat", "README.md"]
           files += [p.as_posix() for p in Path("framework_bundle").rglob("*") if p.is_file()]
           with zipfile.ZipFile("DungeonSiegeCC-Windows.zip", "w", zipfile.ZIP_DEFLATED) as archive:
               for file in files:
