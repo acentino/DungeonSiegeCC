@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.4
+# DungeonSiegeCC — development source v0.3.5
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,32 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Direct Logic reference ZIP analysis (v0.3.5)
+
+The **Analyze Logic reference ZIP** button accepts the ZIP produced by
+**Extract Logic GAS/Skrit**, without first extracting it manually. Select a
+user-owned reference archive and the importer identifies template definitions,
+`specializes` inheritance, names, optional hiring cost, talk jobs and
+potential `base_pm` descendants. You can select one as the donor for a
+character source package; donor validation can now read ZIP entries directly.
+
+A report is written to
+`%APPDATA%\\DungeonSiegeCC\\logic_template_report.json`. The report
+contains **metadata only**, not the original GAS source contents.
+
+**Important:** An actor inherited from `base_pm` is only a **potential
+hireable template**. This does not prove it is spawned in a particular map or
+can be recruited there. Player-party integration, rig export, and in-game
+save/load verification remain unfinished.
+
+Command-line usage:
+
+```powershell
+py -3 logic_inspector.py "C:\\References\\DungeonSiegeCC_logic_references.zip" --report "logic_template_report.json"
+```
+
+We do not publish the original game scripts or extracted models in GitHub.
 
 ## Deep local Tank inspection and selective reference extraction (v0.3.4)
 
@@ -119,7 +145,7 @@ At startup and when manually requested, the source installer checks the latest G
 ## Automated tests
 
 ```powershell
-py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py
+py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py logic_inspector.py
 py -3 -m unittest discover -s tests -v
 ```
 
