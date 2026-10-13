@@ -27,7 +27,7 @@ jobs:
         run: |
           import pathlib, zipfile
           root = pathlib.Path('.')
-          names = ["importer.py", "manager.py", "update_helper.py", "START_WINDOWS.bat", "README.md"]
+          names = ["importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "START_WINDOWS.bat", "README.md"]
           names += [str(p).replace("\\", "/") for p in pathlib.Path("framework_bundle").rglob("*") if p.is_file()]
           with zipfile.ZipFile("DungeonSiegeCC-Windows.zip", "w", zipfile.ZIP_DEFLATED) as archive:
               for name in names:
