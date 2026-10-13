@@ -1,6 +1,25 @@
-# DungeonSiegeCC — development source v0.3.0
+# DungeonSiegeCC — development source v0.3.2
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
+
+## Automatic checks on every startup (v0.3.2)
+
+Every time the Windows tool opens, it **immediately starts a GitHub Release check**
+in a non-blocking background thread and performs a **local game/framework integrity check**.
+The framework check uses its bundled SHA-256 manifest and saved game location.
+Missing, outdated, or damaged managed framework files trigger an install/repair
+prompt; healthy installations do not prompt or rewrite files.
+
+The two startup checks do not show overlapping dialogs. A newer published
+release prompts for an optional download. If you accept, the tool installs
+its own files after closing and **automatically reopens the updated importer**;
+the restarted app checks its bundled framework again. Offline operation is
+supported: network failure does not prevent local framework verification.
+The **Check for updates** and **Framework status / install** buttons remain
+available for manual checks.
+
+**Important:** The bundled framework is still a source/metadata scaffold,
+not a playable Dungeon Siege II companion runtime.
 
 ## Run the Windows importer
 
@@ -29,7 +48,7 @@ The export's `GAME_BUILD_REQUIREMENTS.json` enumerates remaining engine work: mo
 
 ## Updates and releases
 
-The source installer checks the latest GitHub Release and offers an **opt-in** download of its `DungeonSiegeCC-Windows.zip` release asset when newer. It stages a validated archive and replaces only application files after exit, leaving profiles, game data and installed characters untouched. The `.github/workflows/release.yml` workflow can publish a source release when a `v*` tag is pushed or when triggered manually with a version.
+At startup and when manually requested, the source installer checks the latest GitHub Release and offers an **opt-in** download of its `DungeonSiegeCC-Windows.zip` release asset when newer. It stages a validated archive and replaces only application files after exit and automatically relaunches the importer, leaving profiles, game data and installed characters untouched. The `.github/workflows/release.yml` workflow can publish a source release when a `v*` tag is pushed or when triggered manually with a version.
 
 **Public repository:** No GitHub token is required to check or download public releases. Updates require a published GitHub Release containing `DungeonSiegeCC-Windows.zip`; a commit on `main` alone does not trigger an update prompt. To publish a new release, update `manager.VERSION`, `RELEASE_VERSION` and the release workflow tag together. Packaged-EXE updates are not implemented.
 
