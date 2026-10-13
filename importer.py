@@ -1,11 +1,12 @@
 """DungeonSiegeCC desktop companion project editor (Python 3.10+)."""
 import json, re, shutil, struct, tkinter as tk
 from pathlib import Path
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 import manager
 import mmd_assets
 import game_pipeline
 import asset_probe
+import ds2_tank
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
@@ -92,6 +93,8 @@ class App(tk.Tk):
         ttk.Button(game,text="Check for updates",command=self.check_update).grid(row=1,column=1)
         ttk.Button(game,text="Inspect local game archives",command=self.inspect_game_archives).grid(row=2,column=0,sticky="w")
         ttk.Button(game,text="Import MMD model ZIP",command=self.import_mmd_zip).grid(row=2,column=1,sticky="w")
+        ttk.Button(game,text="Extract Logic GAS/Skrit",command=self.extract_logic_references).grid(row=3,column=0,sticky="w")
+        ttk.Button(game,text="Extract filtered ASP/PRS",command=self.extract_object_references).grid(row=3,column=1,sticky="w")
         toolbar=ttk.Frame(root);toolbar.pack(fill="x",pady=8)
         for label,fun in [("New",self.reset),("Open",self.open_project),("Save",self.save_project),("Validate",self.check),("Export source package",self.export)]:
             ttk.Button(toolbar,text=label,command=fun).pack(side="left",padx=3)
@@ -116,23 +119,77 @@ class App(tk.Tk):
         ttk.Label(root,textvariable=self.status,wraplength=850).pack(anchor="w")
 
     def inspect_game_archives(self):
-        """Scan the user's resources locally, never publish their game assets."""
-        path=self.game.get()
-        if not manager.valid_game_folder(path):
+        """Read tank indices locally, never publish or modify original files."""
+        game=self.game.get()
+        if not manager.valid_game_folder(game):
             messagebox.showwarning("Game folder","Choose a valid Dungeon Siege II folder first.")
             return
-        try:
-            report=asset_probe.scan_game_archives(path)
-            location=manager.settings_path().parent/"local_asset_report.json"
-            asset_probe.write_report({"game":report},location)
-            good=sum(bool(e.get("valid_basic_header")) for e in report["archives"])
-            messagebox.showinfo("DS2 resource scan",
-                f"Found {report['archive_count']} resource tanks; {good} valid basic headers.\n"
-                f"Logic found: {report['core_logic_found']}\nObjects found: {report['core_objects_found']}\n"
-                f"Inventory saved locally: {location}\n\nThis scan does not extract ASP/PRS/GAS content.")
-            self.status.set("Local tank headers scanned; no game files changed.")
-        except Exception as error:
-            messagebox.showerror("DS2 archive scan failed",str(error))
+        self.status.set("Reading Logic and Objects tank indices...")
+        import threading
+        def worker():
+            try:
+                basic=asset_probe.scan_game_archives(game)
+                deep=ds2_tank.game_inventory(game)
+                location=manager.settings_path().parent/"local_asset_report.json"
+                location.parent.mkdir(parents=True,exist_ok=True)
+                asset_probe.write_report({"game":basic,"resource_index":deep},location)
+                logic=deep["archives"].get("Logic.ds2res",{})
+                objects=deep["archives"].get("Objects.ds2res",{})
+                def done():
+                    self.status.set(f"Resource inventory saved locally: {location}")
+                    messagebox.showinfo("Dungeon Siege II reference scan",
+                        f"Logic entries: {logic.get('total_files','unavailable')}\n"
+                        f"Objects entries: {objects.get('total_files','unavailable')}\n"
+                        f"Report: {location}\n\nNo game files were changed or uploaded.")
+                self.after(0,done)
+            except Exception as error:
+                msg=str(error)
+                self.after(0,lambda:messagebox.showerror("Resource scan failed",msg))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def extract_logic_references(self):
+        self._extract_references("logic")
+
+    def extract_object_references(self):
+        self._extract_references("objects")
+
+    def _extract_references(self,kind):
+        """Separate files for rig/template analysis without modifying game tanks."""
+        game=self.game.get()
+        if not manager.valid_game_folder(game):
+            messagebox.showwarning("Game folder","Choose a valid Dungeon Siege II folder first.")
+            return
+        contains=None
+        if kind=="objects":
+            contains=simpledialog.askstring("Select reference models",
+                "Extract .asp/.prs entries whose archive path contains (e.g. human, hero, fs0).\n"
+                "Use Inspect local game archives to see example names first.")
+            if not contains or not contains.strip():
+                return
+            contains=contains.strip()
+        parent=filedialog.askdirectory(title="Choose where to save reference files")
+        if not parent:
+            return
+        import uuid,threading
+        target=Path(parent)/("DungeonSiegeCC_"+kind+"_references_"+uuid.uuid4().hex[:8])
+        self.status.set("Extracting "+kind+" reference files locally...")
+        def worker():
+            try:
+                result=ds2_tank.extract_game_references(game,target,kind,contains=contains)
+                def finished():
+                    if kind=="logic" and result["written"]:
+                        self.vars["donor_root"].set(str(target))
+                    msg=(f"Extracted {result['written']}/{result['matched']} reference files to:\n"
+                         f"{target}\n\nRead errors: {len(result['errors'])}. "
+                         "Details in dscc_extraction_report.json.\n"
+                         "Original archives were not modified.")
+                    self.status.set(msg.split("\n")[0])
+                    messagebox.showinfo("Reference extraction",msg)
+                self.after(0,finished)
+            except Exception as error:
+                msg=str(error)
+                self.after(0,lambda:messagebox.showerror("Reference extraction failed",msg))
+        threading.Thread(target=worker,daemon=True).start()
 
     def import_mmd_zip(self):
         filename=filedialog.askopenfilename(title="Select MMD character archive",
