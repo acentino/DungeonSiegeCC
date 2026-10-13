@@ -185,7 +185,7 @@ NPC_NAME = re.compile(r"(?:human|npc|fighter|warrior|mage|ranger|hero|actor|char
 
 def rank_donor(item, chain):
     """Return a transparent compatibility score, not a recruitability claim."""
-    filename = item.get("source_file", "").replace("\\\\", "/")
+    filename = item.get("source_file", "").replace("\\", "/")
     names = " ".join(chain)
     score = 0
     reasons = []
@@ -260,8 +260,8 @@ def inspect_logic_source(source, max_candidates=300):
             candidate["donor_score"] = score
             candidate["donor_reasons"] = reasons
             candidate["recruitment_status"] = "unverified_donor_candidate"
-            candidate["inheritance_complete"] = not bool(
-                parent and parent.lower() not in templates)
+            candidate["inheritance_complete"] = all(
+                name.lower() in templates for name in chain)
             donor_candidates.append(candidate)
     candidates.sort(key=lambda x: (not bool(x["screen_name"]), x["template"].lower()))
     donor_candidates.sort(key=lambda x: (-x["donor_score"], not bool(x["screen_name"]), x["template"].lower()))
@@ -269,7 +269,7 @@ def inspect_logic_source(source, max_candidates=300):
     # matches: the user needs actionable reference names and diagnostics.
     fallback = sorted(
         templates.values(),
-        key=lambda x: (not bool(ACTOR_DIR.search(x["source_file"].replace("\\\\", "/"))),
+        key=lambda x: (not bool(ACTOR_DIR.search(x["source_file"].replace("\\", "/"))),
                        not bool(x["screen_name"]), x["template"].lower()),
     )[:min(max_candidates, 50)]
     return {
