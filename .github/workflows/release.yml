@@ -23,7 +23,9 @@ jobs:
         shell: python
         run: |
           import os
+          import sys
           from pathlib import Path
+          sys.path.insert(0, os.getcwd())
           import manager
           release_tag = Path("RELEASE_VERSION").read_text(encoding="utf-8").strip()
           assert release_tag == "v" + manager.VERSION, (release_tag, manager.VERSION)
