@@ -80,6 +80,47 @@ class TestLogicInspector(unittest.TestCase):
         self.assertFalse(donors["lost_actor"]["inheritance_complete"])
         self.assertGreater(report["diagnostics"]["unresolved_specialization_count"],0)
 
+    def test_dalvi_references_exclude_monsters_and_rank_known_companions(self):
+        specimen = """
+[t:template,n:base_agallan_giant] { [common] { screen_name = "Agallan Giant"; } }
+[t:template,n:npc_ghost_threnith] { [common] { screen_name = "Ghost"; } }
+[t:template,n:npc_morden_kohl_beast] { [common] { screen_name = "Morden-Vir Cavalry"; } }
+[t:template,n:siege_bug_npc] { [common] { screen_name = "Siege Bug"; } }
+[t:template,n:npc_evangeline] {
+    specializes = base_human_female;
+    [common] { screen_name = "Evangeline"; }
+}
+[t:template,n:human_female_villager] {
+    specializes = base_npc_human;
+    [common] { screen_name = "Female Villager"; }
+}
+"""
+        zfile=self.root/"actors.zip"
+        with zipfile.ZipFile(zfile,"w",zipfile.ZIP_DEFLATED) as z:
+            z.writestr("world/contentdb/templates/regular/actors/good/actors.gas", specimen)
+        report=lib.inspect_logic_source(zfile)
+        self.assertEqual(report["potential_recruitable_count"], 0)
+        self.assertGreaterEqual(report["donor_candidate_count"], 6)
+        recommended={x["template"]:x for x in report["humanoid_candidates"]}
+        for name in ("base_agallan_giant","npc_ghost_threnith",
+                     "npc_morden_kohl_beast","siege_bug_npc"):
+            self.assertNotIn(name,recommended)
+        self.assertIn("npc_evangeline",recommended)
+        self.assertIn("human_female_villager",recommended)
+        self.assertEqual(report["humanoid_candidates"][0]["template"],"npc_evangeline")
+        self.assertGreaterEqual(report["excluded_non_humanoid_count"],4)
+        self.assertIn("known DS2 companion name: evangeline",
+                      recommended["npc_evangeline"]["compatibility_reasons"])
+
+    def test_companion_names_are_whole_tokens(self):
+        item={"source_file":"world/actors/good/test.gas","screen_name":"Vixen",
+              "can_sell_self_explicit":"","talk_job":""}
+        result=lib.donor_compatibility(item,["generic_actor"])
+        self.assertNotEqual(result["compatibility_category"],"known_companion_reference")
+        named=dict(item,screen_name="Deru")
+        self.assertEqual(lib.donor_compatibility(named,["npc_deru"])["compatibility_category"],
+                         "known_companion_reference")
+
     def test_windows_archive_paths_match_actor_directory(self):
         item={"source_file":r"world\\contentdb\\templates\\regular\\actors\\good\\town.gas",
               "screen_name":"Town Friend","talk_job":"","can_sell_self_explicit":""}
