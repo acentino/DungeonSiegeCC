@@ -5,6 +5,7 @@ from tkinter import ttk, filedialog, messagebox
 import manager
 import mmd_assets
 import game_pipeline
+import asset_probe
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
@@ -89,6 +90,8 @@ class App(tk.Tk):
         ttk.Button(game,text="Choose game folder",command=self.choose_game).grid(row=0,column=1)
         ttk.Button(game,text="Framework status / install",command=self.framework).grid(row=1,column=0,sticky="w",pady=5)
         ttk.Button(game,text="Check for updates",command=self.check_update).grid(row=1,column=1)
+        ttk.Button(game,text="Inspect local game archives",command=self.inspect_game_archives).grid(row=2,column=0,sticky="w")
+        ttk.Button(game,text="Import MMD model ZIP",command=self.import_mmd_zip).grid(row=2,column=1,sticky="w")
         toolbar=ttk.Frame(root);toolbar.pack(fill="x",pady=8)
         for label,fun in [("New",self.reset),("Open",self.open_project),("Save",self.save_project),("Validate",self.check),("Export source package",self.export)]:
             ttk.Button(toolbar,text=label,command=fun).pack(side="left",padx=3)
@@ -111,6 +114,53 @@ class App(tk.Tk):
             ttk.Button(animations,text="Reset",command=lambda key=k:self.reset_motion(key)).grid(row=i,column=4)
         self.status=tk.StringVar(value="Ready")
         ttk.Label(root,textvariable=self.status,wraplength=850).pack(anchor="w")
+
+    def inspect_game_archives(self):
+        """Scan the user's resources locally, never publish their game assets."""
+        path=self.game.get()
+        if not manager.valid_game_folder(path):
+            messagebox.showwarning("Game folder","Choose a valid Dungeon Siege II folder first.")
+            return
+        try:
+            report=asset_probe.scan_game_archives(path)
+            location=manager.settings_path().parent/"local_asset_report.json"
+            asset_probe.write_report({"game":report},location)
+            good=sum(bool(e.get("valid_basic_header")) for e in report["archives"])
+            messagebox.showinfo("DS2 resource scan",
+                f"Found {report['archive_count']} resource tanks; {good} valid basic headers.\n"
+                f"Logic found: {report['core_logic_found']}\nObjects found: {report['core_objects_found']}\n"
+                f"Inventory saved locally: {location}\n\nThis scan does not extract ASP/PRS/GAS content.")
+            self.status.set("Local tank headers scanned; no game files changed.")
+        except Exception as error:
+            messagebox.showerror("DS2 archive scan failed",str(error))
+
+    def import_mmd_zip(self):
+        filename=filedialog.askopenfilename(title="Select MMD character archive",
+            filetypes=[("MMD ZIP archives","*.zip")])
+        if not filename:return
+        try:
+            report=asset_probe.scan_mmd_zip(filename)
+            models=report["models"]
+            summary=f"Found {len(models)} PMX/PMD models, {report['motion_count']} motions, "
+            summary+=f"{report['texture_count']} textures.\n\n"
+            summary+="\n".join(m["path"] for m in models[:10])
+            if not models or not any(m["recognized_signature"] for m in models):
+                messagebox.showwarning("No usable model",summary+"\n\nNo recognized PMX/PMD signature.")
+                return
+            if not messagebox.askyesno("MMD character archive",summary+"\n\nExtract to a new folder?"):
+                return
+            parent=filedialog.askdirectory(title="Choose parent folder for extracted MMD character")
+            if not parent:return
+            destination=Path(parent)/(Path(filename).stem+"_MMD")
+            result=asset_probe.extract_mmd_zip(filename,destination)
+            if len(result["models"])==1:
+                self.vars["model"].set(result["models"][0])
+            messagebox.showinfo("MMD archive extracted",f"Saved {result['extracted_count']} files to:\n{destination}\n\n"
+                +"One model selected automatically." if len(result["models"])==1 else
+                f"Saved {result['extracted_count']} files to:\n{destination}\n\nChoose a model from the extracted folder.")
+            self.status.set("Extracted MMD files locally; game installation unchanged.")
+        except Exception as error:
+            messagebox.showerror("MMD archive import failed",str(error))
 
     def inspect_model(self):
         path=self.vars["model"].get()
