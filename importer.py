@@ -4,10 +4,11 @@ from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import manager
 import mmd_assets
+import game_pipeline
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
-    return {"version":1,"name":"New Companion","identifier":"new_companion","model":"","class_note":"Fighter","spawn_note":"","recruitment_dialogue":"Join my party?","animations":{k:{"source":"native","file":""} for k in SLOTS}}
+    return {"version":1,"name":"New Companion","identifier":"new_companion","model":"","class_note":"Fighter","spawn_note":"","recruitment_dialogue":"Join my party?","donor_template":"","donor_root":"","animations":{k:{"source":"native","file":""} for k in SLOTS}}
 
 def validate(p):
     errors=[]
@@ -52,6 +53,8 @@ def export_sources(p,directory):
             animation=p["animations"].get(slot,{})
             if animation.get("source")=="custom":
                 mmd_assets.export_motion(animation["file"],neutral/(slot+".motion.json"))
+        if p.get("donor_template") and p.get("donor_root"):
+            game_pipeline.stage_leaf(target/"game_overlay",p["identifier"],p["name"],p["donor_template"],p["donor_root"])
         (target/"project.json").write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
         (target/"BUILD_STATUS.txt").write_text("SOURCE PACKAGE ONLY. Not a playable Dungeon Siege II mod. ASP/PRS conversion, GAS/Skrit recruitment scripts and DS2 resource packaging are not yet implemented.\n",encoding="utf-8")
     except Exception:
@@ -91,10 +94,11 @@ class App(tk.Tk):
         ttk.Button(inspectbar,text="Inspect MMD model",command=self.inspect_model).pack(side="left",padx=3)
         ttk.Button(inspectbar,text="Inspect VMD overrides",command=self.inspect_motion).pack(side="left",padx=3)
         info=ttk.LabelFrame(root,text="Companion",padding=8);info.pack(fill="x");info.columnconfigure(1,weight=1)
-        for i,(key,title) in enumerate([("name","Name"),("identifier","Unique ID"),("model","MMD model (.pmx/.pmd)"),("class_note","Class"),("recruitment_dialogue","Recruitment dialogue"),("spawn_note","Spawn location note")]):
+        for i,(key,title) in enumerate([("name","Name"),("identifier","Unique ID"),("model","MMD model (.pmx/.pmd)"),("class_note","Class"),("recruitment_dialogue","Recruitment dialogue"),("spawn_note","Spawn location note"),("donor_template","DS2 donor actor ID"),("donor_root","Extracted Logic GAS folder")]):
             ttk.Label(info,text=title).grid(row=i,column=0,sticky="w")
             ttk.Entry(info,textvariable=self.vars[key]).grid(row=i,column=1,sticky="ew",pady=3)
             if key=="model":ttk.Button(info,text="Browse",command=self.browse_model).grid(row=i,column=2)
+            if key=="donor_root":ttk.Button(info,text="Browse",command=self.browse_donor_root).grid(row=i,column=2)
         animations=ttk.LabelFrame(root,text="Per-animation override · Native by default",padding=8);animations.pack(fill="both",expand=True,pady=8)
         animations.columnconfigure(2,weight=1)
         for i,k in enumerate(SLOTS):
@@ -136,6 +140,10 @@ class App(tk.Tk):
                 reports.append(f"{slot}: ERROR — {exc}")
         messagebox.showinfo("VMD motion inspection","\\n".join(reports).replace("\\\\n","\\n"))
 
+    def browse_donor_root(self):
+        folder=filedialog.askdirectory(title="Folder of untanked Dungeon Siege II Logic.ds2res GAS files")
+        if folder:self.vars["donor_root"].set(folder)
+
     def browse_model(self):
         f=filedialog.askopenfilename(filetypes=[("MMD models","*.pmx *.pmd")])
         if f:self.vars["model"].set(f)
@@ -167,7 +175,11 @@ class App(tk.Tk):
     def check(self):
         errors=validate(self.capture())
         if errors:messagebox.showerror("Validation","\n".join(errors))
-        else:messagebox.showinfo("Validation","Source files valid. Game-ready mod conversion is not implemented.")
+        else:
+            if self.vars["donor_template"].get() or self.vars["donor_root"].get():
+                try:game_pipeline.verify_donor(self.vars["donor_root"].get(),self.vars["donor_template"].get())
+                except Exception as e:messagebox.showerror("Donor validation",str(e));return
+            messagebox.showinfo("Validation","Source paths valid. Actual DS2 animation retargeting and NPC map integration still require game assets.")
     def export(self):
         folder=filedialog.askdirectory(title="Export source package")
         if folder:
