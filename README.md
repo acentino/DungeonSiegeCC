@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.6
+# DungeonSiegeCC — development source v0.3.7
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,31 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Humanoid donor filtering for Dalvi (v0.3.7)
+
+Earlier builds returned high-scoring **Agallan Giant, ghost, siege bug,
+Morden beast, and golem** actor templates because they lived under
+`actors/good`. A directory score is **not** evidence of a compatible
+human character rig or recruitability.
+
+The Logic analysis report now retains the broad `donor_candidates`
+catalogue but adds `humanoid_candidates`, `humanoid_candidate_count`,
+and `excluded_non_humanoid_count`. The GUI suggests this smaller set
+instead of offering the top raw scores. The display favors exact tokens
+matching known vanilla companion names (e.g. Deru, Taar, Evangeline,
+Finala) and human/elf/dryad/female references. It suppresses obvious
+monster/hostile candidates when evaluating a normal MMD humanoid.
+Every suggestion records its category and reasons; **none has been
+confirmed to use a compatible ASP skeleton or have functional hire logic**.
+The broader template report remains available for manual evaluation.
+
+If no humanoid candidates are found, select **Cancel** and review/share
+the small `%APPDATA%\\DungeonSiegeCC\\logic_template_report.json`.
+Do not choose a giant or beast merely to satisfy the dialog. Unresolved
+inheritance references can reflect incomplete extraction, missing
+external definitions, or ambiguous GAS parsing and must be checked
+against the specific game resources.
 
 ## Logic donor discovery with zero base_pm matches (v0.3.6)
 
