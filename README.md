@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.2
+# DungeonSiegeCC — development source v0.3.3
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,35 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Local archive inspection and importing a character ZIP (v0.3.3)
+
+Use **Inspect local game archives** to inventory the game's `Resources/*.ds2res`
+and validate basic Tank header offsets. This reads only the archive headers,
+**not the compressed files inside**. Core `Logic.ds2res` and
+`Objects.ds2res` are identified; a JSON report is saved in
+`%APPDATA%\\DungeonSiegeCC\\local_asset_report.json`.
+This report stays on your PC. No original game file is sent to GitHub or copied
+into the framework.
+
+Use **Import MMD model ZIP** to inspect models (.pmx/.pmd), motion (.vmd),
+and texture filenames *without extracting*. On confirmation, select a parent
+directory: supported asset files are extracted into a fresh
+`<ZipName>_MMD` subdirectory, leaving the ZIP untouched. Unsafe paths
+and symlinks are blocked. If the archive contains only one PMX/PMD, it is
+selected in the importer automatically. Existing directories are never
+overwritten. The tool will not unpack copyrighted game tanks or import
+skinned assets into the DS2 engine yet.
+
+A command-line report is also available:
+
+```powershell
+py -3 asset_probe.py --game "C:\\Games\\Dungeon Siege II" --mmd-zip "C:\\Models\\Dalvi MMD.zip" --report "asset_report.json"
+```
+
+If you need a complete asset inventory, use your own licensed game data and a
+compatible DS2 Tank Viewer locally. This scan intentionally **does not claim**
+it can decrypt, extract, or repack DS2 resources.
 
 ## MMD model and animation pipeline
 
