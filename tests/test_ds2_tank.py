@@ -79,6 +79,26 @@ class TankTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 tank.extract(destination, (".asp",))
 
+    def test_local_game_inventory_and_reference_filtering(self):
+        from ds2_tank import game_inventory, extract_game_references
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            resources=root/"Resources"
+            resources.mkdir()
+            synthetic_tank(resources/"Logic.ds2res")
+            synthetic_tank(resources/"Objects.ds2res")
+            inventory=game_inventory(root)
+            self.assertEqual(inventory["archives"]["Logic.ds2res"]["total_files"],3)
+            extracted=root/"logic_output"
+            report=extract_game_references(root,extracted,"logic")
+            self.assertEqual(report["written"],1)
+            self.assertTrue((extracted/"mycompanion.gas").is_file())
+            report=extract_game_references(root,root/"object_output","objects",contains="run")
+            self.assertEqual(report["written"],1)
+            self.assertTrue((root/"object_output"/"run.prs").is_file())
+            with self.assertRaises(TankError):
+                extract_game_references(root,root/"missingfilter","objects")
+
     def test_corrupt_magic(self):
         with tempfile.TemporaryDirectory() as d:
             file=Path(d)/"bad.ds2res"
