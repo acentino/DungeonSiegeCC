@@ -5,9 +5,11 @@ import os
 import shutil
 import sys
 import urllib.request
+import urllib.error
+import zipfile
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 REPO = "acentino/DungeonSiegeCC"
 FRAMEWORK_DIR = "DungeonSiegeCC"
 
@@ -93,12 +95,90 @@ def install_framework(game,bundle_root=None):
 def version_tuple(value):
     return tuple(int(part) for part in value.lstrip("v").split("."))
 
+def _github_headers(binary=False):
+    h = {"User-Agent": "DungeonSiegeCC/" + VERSION, "Accept": "application/octet-stream" if binary else "application/vnd.github+json"}
+    token = os.getenv("DUNGEONSIEGECC_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return h
+
+
 def latest_release(opener=None):
-    url="https://api.github.com/repos/"+REPO+"/releases/latest"
-    req=urllib.request.Request(url,headers={"User-Agent":"DungeonSiegeCC/"+VERSION,"Accept":"application/vnd.github+json"})
-    opener=opener or urllib.request.urlopen
-    with opener(req,timeout=8) as response:release=json.load(response)
-    tag=release["tag_name"]
-    if not isinstance(tag,str) or len(tag)>40:raise ValueError("Invalid version")
-    asset=next((a for a in release.get("assets",[]) if a.get("name")=="DungeonSiegeCC-Windows.zip"),None)
-    return {"version":tag,"newer":version_tuple(tag)>version_tuple(VERSION),"download_url":asset.get("browser_download_url") if asset else None,"page":release.get("html_url","https://github.com/"+REPO+"/releases")}
+    url = "https://api.github.com/repos/" + REPO + "/releases/latest"
+    req = urllib.request.Request(url, headers=_github_headers())
+    opener = opener or urllib.request.urlopen
+    try:
+        with opener(req, timeout=8) as response:
+            release = json.load(response)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403, 404):
+            raise RuntimeError("Cannot check releases. This repository is private or has no published release. For private repos set DUNGEONSIEGECC_GITHUB_TOKEN, or publish releases in a public repository.") from exc
+        raise
+    tag = release["tag_name"]
+    if not isinstance(tag, str) or not __import__("re").fullmatch(r"v?\\d+\\.\\d+\\.\\d+", tag):
+        raise ValueError("Unsupported GitHub release version")
+    asset = next((a for a in release.get("assets", []) if a.get("name") == "DungeonSiegeCC-Windows.zip"), None)
+    use_api = bool(os.getenv("DUNGEONSIEGECC_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN"))
+    download = (asset.get("url") if use_api else asset.get("browser_download_url")) if asset else None
+    return {"version": tag, "newer": version_tuple(tag) > version_tuple(VERSION), "download_url": download,
+            "page": release.get("html_url", "https://github.com/" + REPO + "/releases")}
+
+
+def download_release(url, destination, opener=None):
+    public_prefix = "https://github.com/" + REPO + "/releases/download/"
+    private_prefix = "https://api.github.com/repos/" + REPO + "/releases/assets/"
+    if not (url.startswith(public_prefix) or url.startswith(private_prefix)):
+        raise ValueError("Update URL is not an official DungeonSiegeCC release asset")
+    if url.startswith(private_prefix) and not (os.getenv("DUNGEONSIEGECC_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")):
+        raise ValueError("Private release download requires DUNGEONSIEGECC_GITHUB_TOKEN")
+    req = urllib.request.Request(url, headers=_github_headers(binary=url.startswith(private_prefix)))
+    opener = opener or urllib.request.urlopen
+    destination = Path(destination)
+    try:
+        with opener(req, timeout=30) as response, destination.open("wb") as output:
+            size = 0
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > 150 * 1024 * 1024:
+                    raise ValueError("Update is too large")
+                output.write(chunk)
+        if not zipfile.is_zipfile(destination):
+            raise ValueError("Downloaded release asset is not a ZIP file")
+        return destination
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+
+
+def extract_update(archive, destination):
+    """Stage and validate a release, rejecting unsafe ZIP paths and symlinks."""
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=False)
+    try:
+        with zipfile.ZipFile(archive) as z:
+            entries = z.infolist()
+            if len(entries) > 2000 or sum(x.file_size for x in entries) > 400 * 1024 * 1024:
+                raise ValueError("Oversized release archive")
+            for info in entries:
+                p = Path(info.filename.replace("\\\\", "/"))
+                if not p.parts or p.is_absolute() or ".." in p.parts or ":" in info.filename:
+                    raise ValueError("Unsafe update path")
+                if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError("Symlinks are not allowed in update packages")
+                if info.is_dir():
+                    continue
+                dest = destination / p
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(info) as src, dest.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        for name in ("importer.py", "manager.py", "update_helper.py", "START_WINDOWS.bat"):
+            if not (destination / name).is_file():
+                raise ValueError("Incomplete release: " + name)
+        bundled_manifest(destination / "framework_bundle")
+        return destination
+    except Exception:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
