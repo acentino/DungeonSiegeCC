@@ -74,8 +74,10 @@ class App(tk.Tk):
         self.motions={k:tk.StringVar() for k in SLOTS}
         self.project_file=None
         self.build_ui()
-        self.after(200,self.first_launch)
-        self.after(2000,self.check_update)
+        self._startup_framework_running = False
+        self._pending_startup_update = None
+        self._checking_updates = False
+        self.after(100, self.startup_checks)
 
     def build_ui(self):
         root=ttk.Frame(self,padding=12);root.pack(fill="both",expand=True)
@@ -185,6 +187,36 @@ class App(tk.Tk):
         if folder:
             try:out=export_sources(self.capture(),folder);self.status.set("Exported source package: "+str(out))
             except Exception as e:messagebox.showerror("Export failed",str(e))
+    def startup_checks(self):
+        """Run the online and local checks automatically on EVERY launch."""
+        self.status.set("Startup: checking GitHub releases and local framework files...")
+        self._startup_framework_running = True
+        # Start the network request immediately in a daemon thread. The game
+        # folder/framework wizard runs on the UI thread; update prompts queue
+        # until it has finished, avoiding overlapping modal windows.
+        self.check_update(startup=True)
+        self.after(10, self.startup_framework_check)
+
+    def startup_framework_check(self):
+        try:
+            self.first_launch()
+        finally:
+            self._startup_framework_running = False
+            if self._pending_startup_update is not None:
+                success, outcome = self._pending_startup_update
+                self._pending_startup_update = None
+                self.finish_update_check(success, outcome, startup=True)
+
+    def finish_update_check(self, success, outcome, startup=False):
+        self._checking_updates = False
+        if startup and self._startup_framework_running:
+            self._pending_startup_update = (success, outcome)
+            return
+        if success:
+            self.update_offer(outcome)
+        else:
+            self.status.set("Update check unavailable (framework check still ran): " + str(outcome))
+
     def first_launch(self):
         if not manager.valid_game_folder(self.game.get()):
             messagebox.showinfo("Game setup","Select your Dungeon Siege II installation folder.")
@@ -205,13 +237,20 @@ class App(tk.Tk):
                 manager.install_framework(path)
                 self.status.set("Framework scaffold installed.")
         except Exception as e:messagebox.showerror("Framework installation failed",str(e))
-    def check_update(self):
+    def check_update(self, startup=False):
+        """Check GitHub automatically at launch and on manual request."""
+        if self._checking_updates:
+            return
+        self._checking_updates = True
+        self.status.set("Checking GitHub for updates...")
         import threading
         def check():
             try:
-                release=manager.latest_release()
-                self.after(0,lambda:self.update_offer(release))
-            except Exception as e:self.after(0,lambda msg=str(e):self.status.set("Update check unavailable: "+msg))
+                release = manager.latest_release()
+                self.after(0, lambda: self.finish_update_check(True, release, startup=startup))
+            except Exception as exc:
+                error = str(exc)
+                self.after(0, lambda: self.finish_update_check(False, error, startup=startup))
         threading.Thread(target=check,daemon=True).start()
     def update_offer(self,release):
         if not release["newer"]:
