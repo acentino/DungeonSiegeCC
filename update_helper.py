@@ -67,9 +67,26 @@ def apply_update(source, target, previous_pid=None):
         shutil.rmtree(source.parent, ignore_errors=True)
     return len(replaced)
 
+def relaunch_importer(target):
+    """Open the updated application so its startup checks run again."""
+    import subprocess
+    target = Path(target).resolve()
+    script = target / "importer.py"
+    if not script.is_file():
+        raise FileNotFoundError("Updated importer.py is missing")
+    return subprocess.Popen(
+        [sys.executable, str(script)],
+        cwd=str(target),
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
 if __name__ == "__main__":
     try:
+        if len(sys.argv) != 4:
+            raise ValueError("Usage: update_helper.py <staged> <target> <previous_pid>")
         apply_update(*sys.argv[1:4])
+        relaunch_importer(sys.argv[2])
     except Exception as exc:
         Path.home().joinpath("DungeonSiegeCC-update-error.txt").write_text(str(exc), encoding="utf-8")
         raise
