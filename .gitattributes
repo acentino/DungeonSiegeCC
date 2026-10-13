@@ -1,0 +1,2 @@
+# Preserve bundled framework files exactly as stored; hashes must match on Windows.
+framework_bundle/** -text
