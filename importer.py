@@ -167,7 +167,7 @@ class App(tk.Tk):
                 import webbrowser
                 webbrowser.open(release["page"])
             return
-        if messagebox.askyesno("Update available","DungeonSiegeCC "+release["version"]+" is available. Download and install the updated tool?\\n\\nGame files and character projects will not be deleted."):
+        if messagebox.askyesno("Update available","DungeonSiegeCC "+release["version"]+" is available. Download and install the updated tool?\n\nGame files and character projects will not be deleted."):
             self.status.set("Downloading tool update...")
             import threading
             threading.Thread(target=self.download_update,args=(release,),daemon=True).start()
@@ -190,7 +190,7 @@ class App(tk.Tk):
         if getattr(sys,"frozen",False):
             messagebox.showwarning("EXE update unsupported","The source updater cannot replace a packaged EXE. Download the new installer from GitHub.")
             return
-        if not messagebox.askyesno("Apply update","Close the importer and apply the downloaded update?\\n\\nSave your current companion project first."):
+        if not messagebox.askyesno("Apply update","Close the importer and apply the downloaded update?\n\nSave your current companion project first."):
             return
         helper=Path(staged)/"update_helper.py"
         if not helper.is_file():
