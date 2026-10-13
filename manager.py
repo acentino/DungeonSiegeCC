@@ -174,7 +174,7 @@ def extract_update(archive, destination):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 with z.open(info) as src, dest.open("wb") as dst:
                     shutil.copyfileobj(src, dst)
-        for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "ds2_tank.py", "START_WINDOWS.bat"):
+        for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "asset_probe.py", "ds2_tank.py", "logic_inspector.py", "START_WINDOWS.bat"):
             if not (destination / name).is_file():
                 raise ValueError("Incomplete release: " + name)
         bundled_manifest(destination / "framework_bundle")
