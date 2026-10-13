@@ -115,7 +115,7 @@ def latest_release(opener=None):
             raise RuntimeError("Cannot check releases. This repository is private or has no published release. For private repos set DUNGEONSIEGECC_GITHUB_TOKEN, or publish releases in a public repository.") from exc
         raise
     tag = release["tag_name"]
-    if not isinstance(tag, str) or not __import__("re").fullmatch(r"v?\\d+\\.\\d+\\.\\d+", tag):
+    if not isinstance(tag, str) or not __import__("re").fullmatch(r"v?\d+\.\d+\.\d+", tag):
         raise ValueError("Unsupported GitHub release version")
     asset = next((a for a in release.get("assets", []) if a.get("name") == "DungeonSiegeCC-Windows.zip"), None)
     use_api = bool(os.getenv("DUNGEONSIEGECC_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN"))
@@ -163,7 +163,7 @@ def extract_update(archive, destination):
             if len(entries) > 2000 or sum(x.file_size for x in entries) > 400 * 1024 * 1024:
                 raise ValueError("Oversized release archive")
             for info in entries:
-                p = Path(info.filename.replace("\\\\", "/"))
+                p = Path(info.filename.replace("\\", "/"))
                 if not p.parts or p.is_absolute() or ".." in p.parts or ":" in info.filename:
                     raise ValueError("Unsafe update path")
                 if (info.external_attr >> 16) & 0o170000 == 0o120000:
