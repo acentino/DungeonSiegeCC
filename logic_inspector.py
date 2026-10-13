@@ -15,7 +15,7 @@ MAX_FILES = 80000
 MAX_ARCHIVE_SIZE = 512 * 1024 * 1024
 MAX_GAS_SIZE = 8 * 1024 * 1024
 TEMPLATE_TAG = re.compile(r"\[\s*t\s*:\s*template\s*,\s*n\s*:\s*([a-z_][a-z0-9_]*)\s*\]", re.I)
-ASSIGN = re.compile(r'(?im)^\s*([a-z_][a-z_0-9]*)\s*=\s*("(?:[^"\\]|\\.)*"|[^;\r\n]+)\s*;')
+ASSIGN = re.compile(r'(?i)\b([a-z_][a-z_0-9]*)\s*=\s*("(?:[^"\\]|\\.)*"|[^;\r\n{}]+)\s*;')
 BASE_PM = re.compile(r"^base_pm(?:_|$)", re.I)
 
 
