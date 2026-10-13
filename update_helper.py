@@ -27,7 +27,7 @@ def wait_for_exit(pid, seconds=30):
 
 def apply_update(source, target, previous_pid=None):
     source, target = Path(source).resolve(), Path(target).resolve()
-    if not (source / "importer.py").is_file() or not (source / "manager.py").is_file():
+    if any(not (source / name).is_file() for name in ("importer.py", "manager.py", "mmd_assets.py", "game_pipeline.py")):
         raise ValueError("Incomplete update package")
     if not (source / "framework_bundle" / "manifest.json").is_file():
         raise ValueError("Framework bundle missing from update")
