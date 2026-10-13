@@ -31,7 +31,7 @@ jobs:
           assert release_tag == "v" + manager.VERSION, (release_tag, manager.VERSION)
       - name: Validate application source
         run: |
-          python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py
+          python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py
           python -m unittest discover -s tests -v
           python -c "import manager; manager.bundled_manifest(); print('Framework bundle checksum verified')"
       - name: Package offline-first Windows source application
