@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
             archive=root/'logic_references.zip'
             with zipfile.ZipFile(archive,'w') as z:
                 z.writestr('world/contentdb/templates/regular/actors/good/pms.gas',
-                    '[t:template,n:base_pm_fg]\\n{ specializes = base_human; }')
+                    '[t:template,n:base_pm_fg]\n{ specializes = base_human; }')
             output=g.stage_leaf(root/'out','dalvi','Dalvi','base_pm_fg',archive)
             self.assertTrue(output.is_file())
             self.assertIn('logic_references.zip', (root/'out'/'GAME_BUILD_REQUIREMENTS.json').read_text())
