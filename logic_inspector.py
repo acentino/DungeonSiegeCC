@@ -217,6 +217,78 @@ def rank_donor(item, chain):
 
 
 
+
+# Names of known, recruitable Dungeon Siege II campaign characters.
+# Recognition is by complete tokens, never by substring (e.g. "vixen" != "Vix").
+KNOWN_COMPANIONS = frozenset({
+    "drevin", "deru", "lothar", "taar", "vix", "sartan",
+    "amren", "finala", "evangeline", "eva",
+})
+# Known non-humanoid or hostile donor types that are incompatible with a
+# normal female-human skinned rig without substantial retargeting.
+NON_HUMANOID = re.compile(
+    r"(?<![a-z])(?:agallan|giant|golem|kohl_beast|beast|siege_bug|"
+    r"bug|ghost|threnith|morden|skeleton|zombie|wolf|spider|"
+    r"elemental|naiad|dragon|ogre|troll|scorpion|pet|"
+    r"undead|monster|critter|insect|arachnid)(?![a-z])", re.I
+)
+HUMANOID = re.compile(
+    r"(?<![a-z])(?:human|female|girl|woman|villager|"
+    r"townsperson|civilian|dryad|elf|elf_female|farmgirl|"
+    r"mercenary|hireling)(?![a-z])", re.I
+)
+
+
+def donor_compatibility(item, chain):
+    """Assess relevance as a humanoid character *reference*, not recruitability.
+
+    Path-only scores are insufficient: monsters in actors/good can score 86+
+    yet have an entirely incompatible rig with Dalvi.
+    """
+    path = item.get("source_file", "").replace("\\", "/")
+    names = " ".join(chain + [item.get("screen_name", "")]).lower()
+    tokens = set(re.findall(r"[a-z]+", names))
+    # Match canonical companions as whole tokens, not incidental substrings.
+    matches = sorted(tokens & KNOWN_COMPANIONS)
+    monster = bool(NON_HUMANOID.search(names))
+    humanoid = bool(HUMANOID.search(names))
+    explicit_hire = item.get("can_sell_self_explicit", "").lower() in ("true", "yes", "1")
+    actor_directory = bool(ACTOR_DIR.search(path))
+    reasons = []
+    if matches:
+        reasons.append("known DS2 companion name: " + ", ".join(matches))
+    if explicit_hire:
+        reasons.append("explicit can_sell_self")
+    if humanoid:
+        reasons.append("humanoid / human-adjacent naming")
+    if monster:
+        reasons.append("non-human or hostile species naming")
+    if not actor_directory:
+        reasons.append("not in an actor directory")
+
+    if monster and not matches:
+        category = "non_humanoid_or_hostile"
+        priority = -100
+    elif matches:
+        category = "known_companion_reference"
+        priority = 300
+    elif actor_directory and humanoid:
+        category = "humanoid_reference"
+        priority = 130
+    elif actor_directory and explicit_hire:
+        category = "hire_property_reference"
+        priority = 120
+    else:
+        category = "unclassified_actor"
+        priority = 0
+    return {
+        "compatibility_category": category,
+        "compatibility_priority": priority,
+        "compatibility_reasons": reasons,
+        "compatible_with_dalvi_unverified": True,
+    }
+
+
 def inspect_logic_source(source, max_candidates=300):
     templates, gas_files = load_templates(source)
 
@@ -236,6 +308,8 @@ def inspect_logic_source(source, max_candidates=300):
 
     candidates = []
     donor_candidates = []
+    humanoid_candidates = []
+    excluded_non_humanoid_count = 0
     missing_parents = {}
     from collections import Counter
     root_types = Counter()
@@ -262,9 +336,20 @@ def inspect_logic_source(source, max_candidates=300):
             candidate["recruitment_status"] = "unverified_donor_candidate"
             candidate["inheritance_complete"] = all(
                 name.lower() in templates for name in chain)
+            candidate.update(donor_compatibility(item, chain))
             donor_candidates.append(candidate)
+            if candidate["compatibility_category"] in (
+                "known_companion_reference", "humanoid_reference",
+                "hire_property_reference",
+            ):
+                humanoid_candidates.append(candidate)
+            elif candidate["compatibility_category"] == "non_humanoid_or_hostile":
+                excluded_non_humanoid_count += 1
     candidates.sort(key=lambda x: (not bool(x["screen_name"]), x["template"].lower()))
     donor_candidates.sort(key=lambda x: (-x["donor_score"], not bool(x["screen_name"]), x["template"].lower()))
+    humanoid_candidates.sort(key=lambda x: (
+        -x["compatibility_priority"], -x["donor_score"],
+        not bool(x["screen_name"]), x["template"].lower()))
     # Include a small catalogue when the extraction is partial / nothing
     # matches: the user needs actionable reference names and diagnostics.
     fallback = sorted(
@@ -282,6 +367,10 @@ def inspect_logic_source(source, max_candidates=300):
         "donor_candidate_count": len(donor_candidates),
         "donor_candidates": donor_candidates[:max_candidates],
         "truncated_donor_candidates": len(donor_candidates) > max_candidates,
+        "humanoid_candidate_count": len(humanoid_candidates),
+        "humanoid_candidates": humanoid_candidates[:max_candidates],
+        "truncated_humanoid_candidates": len(humanoid_candidates) > max_candidates,
+        "excluded_non_humanoid_count": excluded_non_humanoid_count,
         "diagnostics": {
             "base_pm_templates_found": sum(bool(BASE_PM.match(x["template"])) for x in templates.values()),
             "unresolved_specialization_count": sum(missing_parents.values()),
@@ -300,6 +389,7 @@ def inspect_logic_source(source, max_candidates=300):
         "notes": [
             "base_pm lineage is only one possible convention, not a prerequisite for a DS2 actor.",
             "Donor scores are inspection hints based on template paths/names/properties, NOT proof the game can recruit that NPC.",
+            "Humanoid compatibility is guessed from names and paths, NOT from ASP skeleton or PRS animation validation.",
             "Missing base templates can prevent tracing a complete inheritance chain.",
             "Game-owned GAS/Skrit bodies and character assets are excluded from this report.",
             "NPC placement, dialogue, animation compatibility, and save-game persistence remain unverified.",
