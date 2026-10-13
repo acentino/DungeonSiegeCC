@@ -22,8 +22,15 @@ def verify_donor(directory, template):
     if not IDENT.fullmatch(template):
         raise PipelineError('Invalid donor template name')
     root = Path(directory)
+    if root.is_file() and root.suffix.lower() == ".zip":
+        import logic_inspector
+        try:
+            found = logic_inspector.verify_donor_in_source(root, template)
+        except logic_inspector.LogicAnalysisError as exc:
+            raise PipelineError(str(exc)) from exc
+        return str(root) + "!" + found["source_file"]
     if not root.is_dir():
-        raise PipelineError('Provide a folder of extracted DS2 Logic.ds2res GAS files')
+        raise PipelineError('Provide a ZIP of Logic references or a directory of extracted GAS files')
     count=0
     for file in root.rglob('*.gas'):
         count+=1
