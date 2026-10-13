@@ -159,9 +159,48 @@ class App(tk.Tk):
             except Exception as e:self.after(0,lambda msg=str(e):self.status.set("Update check unavailable: "+msg))
         threading.Thread(target=check,daemon=True).start()
     def update_offer(self,release):
-        if not release["newer"]:return
-        if messagebox.askyesno("Update available","Version "+release["version"]+" available. Open GitHub Releases?"):
-            import webbrowser
-            webbrowser.open(release["page"])
+        if not release["newer"]:
+            self.status.set("Importer is up to date ("+manager.VERSION+").")
+            return
+        if not release["download_url"]:
+            if messagebox.askyesno("New version","Version "+release["version"]+" is available, but no Windows update archive was published. Open GitHub?"):
+                import webbrowser
+                webbrowser.open(release["page"])
+            return
+        if messagebox.askyesno("Update available","DungeonSiegeCC "+release["version"]+" is available. Download and install the updated tool?\\n\\nGame files and character projects will not be deleted."):
+            self.status.set("Downloading tool update...")
+            import threading
+            threading.Thread(target=self.download_update,args=(release,),daemon=True).start()
+
+    def download_update(self,release):
+        import tempfile
+        from pathlib import Path
+        try:
+            root=Path(tempfile.mkdtemp(prefix="dscc_stage_"))
+            archive=root/"update.zip"
+            manager.download_release(release["download_url"],archive)
+            staged=manager.extract_update(archive,root/"staged")
+            self.after(0,lambda:self.install_update(staged))
+        except Exception as exc:
+            self.after(0,lambda msg=str(exc):messagebox.showerror("Update failed",msg))
+
+    def install_update(self,staged):
+        import os,subprocess,sys
+        from pathlib import Path
+        if getattr(sys,"frozen",False):
+            messagebox.showwarning("EXE update unsupported","The source updater cannot replace a packaged EXE. Download the new installer from GitHub.")
+            return
+        if not messagebox.askyesno("Apply update","Close the importer and apply the downloaded update?\\n\\nSave your current companion project first."):
+            return
+        helper=Path(staged)/"update_helper.py"
+        if not helper.is_file():
+            messagebox.showerror("Update failed","Update helper missing")
+            return
+        try:
+            subprocess.Popen([sys.executable,str(helper),str(staged),str(Path(__file__).resolve().parent),str(os.getpid())],
+                             creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            self.destroy()
+        except OSError as exc:
+            messagebox.showerror("Update failed",str(exc))
 
 if __name__=="__main__":App().mainloop()
