@@ -90,8 +90,8 @@ class StartupChecksTests(unittest.TestCase):
                 update_helper.relaunch_importer(root)
                 self.assertEqual(popen.call_count, 1)
                 args, kwargs = popen.call_args
-                self.assertEqual(Path(args[0][1]), root / "importer.py")
-                self.assertEqual(Path(kwargs["cwd"]), root)
+                self.assertEqual(Path(args[0][1]).resolve(), (root / "importer.py").resolve())
+                self.assertEqual(Path(kwargs["cwd"]).resolve(), root.resolve())
 
 
 if __name__ == "__main__":
