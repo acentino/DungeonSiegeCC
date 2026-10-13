@@ -3,6 +3,7 @@ import json, re, shutil, struct, tkinter as tk
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import manager
+import mmd_assets
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
@@ -42,6 +43,15 @@ def export_sources(p,directory):
                 shutil.copy2(a["file"],assets/(k+".vmd"))
                 a["file"]=str(Path("source_assets")/(k+".vmd"))
             else: a["file"]=""
+        # Produce inspection/conversion intermediates alongside untouched sources.
+        neutral=target/"neutral_intermediates"
+        neutral.mkdir()
+        if model.suffix.lower()==".pmx":
+            mmd_assets.export_obj(model,neutral/"model.obj")
+        for slot in SLOTS:
+            animation=p["animations"].get(slot,{})
+            if animation.get("source")=="custom":
+                mmd_assets.export_motion(animation["file"],neutral/(slot+".motion.json"))
         (target/"project.json").write_text(json.dumps(data,indent=2,ensure_ascii=False),encoding="utf-8")
         (target/"BUILD_STATUS.txt").write_text("SOURCE PACKAGE ONLY. Not a playable Dungeon Siege II mod. ASP/PRS conversion, GAS/Skrit recruitment scripts and DS2 resource packaging are not yet implemented.\n",encoding="utf-8")
     except Exception:
@@ -77,6 +87,9 @@ class App(tk.Tk):
         toolbar=ttk.Frame(root);toolbar.pack(fill="x",pady=8)
         for label,fun in [("New",self.reset),("Open",self.open_project),("Save",self.save_project),("Validate",self.check),("Export source package",self.export)]:
             ttk.Button(toolbar,text=label,command=fun).pack(side="left",padx=3)
+        inspectbar=ttk.Frame(root);inspectbar.pack(fill="x")
+        ttk.Button(inspectbar,text="Inspect MMD model",command=self.inspect_model).pack(side="left",padx=3)
+        ttk.Button(inspectbar,text="Inspect VMD overrides",command=self.inspect_motion).pack(side="left",padx=3)
         info=ttk.LabelFrame(root,text="Companion",padding=8);info.pack(fill="x");info.columnconfigure(1,weight=1)
         for i,(key,title) in enumerate([("name","Name"),("identifier","Unique ID"),("model","MMD model (.pmx/.pmd)"),("class_note","Class"),("recruitment_dialogue","Recruitment dialogue"),("spawn_note","Spawn location note")]):
             ttk.Label(info,text=title).grid(row=i,column=0,sticky="w")
@@ -92,6 +105,36 @@ class App(tk.Tk):
             ttk.Button(animations,text="Reset",command=lambda key=k:self.reset_motion(key)).grid(row=i,column=4)
         self.status=tk.StringVar(value="Ready")
         ttk.Label(root,textvariable=self.status,wraplength=850).pack(anchor="w")
+
+    def inspect_model(self):
+        path=self.vars["model"].get()
+        if not Path(path).is_file():
+            messagebox.showwarning("Missing model","Choose an MMD model first.")
+            return
+        try:
+            if path.lower().endswith(".pmx"):
+                result=mmd_assets.read_pmx(path)
+                detail=f"PMX {result['version']} — {result['name']}\\nVertices: {len(result['vertices'])}\\nTriangles: {len(result['indices'])//3}\\nBones: {len(result['bones'])}\\nMaterials: {len(result['materials'])}"
+            else:
+                result=mmd_assets.inspect_pmd(path)
+                detail=f"PMD — {result['name']}\\nVertices: {result['vertex_count']}\\nConvert to PMX to export neutral OBJ."
+            messagebox.showinfo("Model inspection",detail.replace("\\\\n","\\n"))
+        except Exception as exc:
+            messagebox.showerror("Model inspection failed",str(exc))
+
+    def inspect_motion(self):
+        custom=[(k,self.motions[k].get()) for k in SLOTS if self.sources[k].get()=="custom" and self.motions[k].get()]
+        if not custom:
+            messagebox.showinfo("Motions","No VMD overrides configured; all animations are native.")
+            return
+        reports=[]
+        for slot, path in custom:
+            try:
+                motion=mmd_assets.read_vmd(path)
+                reports.append(f"{slot}: {motion['keyframe_count']} keys, {len(motion['tracks'])} bones, {round(max(0,motion['frame_count']-1)/30,2)}s")
+            except Exception as exc:
+                reports.append(f"{slot}: ERROR — {exc}")
+        messagebox.showinfo("VMD motion inspection","\\n".join(reports).replace("\\\\n","\\n"))
 
     def browse_model(self):
         f=filedialog.askopenfilename(filetypes=[("MMD models","*.pmx *.pmd")])
