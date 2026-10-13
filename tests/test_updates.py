@@ -39,7 +39,7 @@ class UpdatesTests(unittest.TestCase):
     def test_archive_staging(self):
         archive = self.root / "good.zip"
         with zipfile.ZipFile(archive, "w") as z:
-            for name in ("importer.py", "manager.py", "update_helper.py", "START_WINDOWS.bat"):
+            for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py", "START_WINDOWS.bat"):
                 z.writestr(name, "placeholder")
             z.write(self.bundle / "README.txt", "framework_bundle/README.txt")
             z.write(self.bundle / "manifest.json", "framework_bundle/manifest.json")
@@ -51,7 +51,7 @@ class UpdatesTests(unittest.TestCase):
         target = self.root / "app"
         stage.mkdir()
         target.mkdir()
-        for name in ("importer.py", "manager.py", "update_helper.py"):
+        for name in ("importer.py", "manager.py", "update_helper.py", "mmd_assets.py", "game_pipeline.py"):
             (stage / name).write_text("new", encoding="utf-8")
             (target / name).write_text("old", encoding="utf-8")
         (stage / "framework_bundle").mkdir()
