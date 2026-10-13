@@ -19,6 +19,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile application modules
-        run: python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py
+        run: python -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
