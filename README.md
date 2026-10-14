@@ -1,4 +1,4 @@
-# DungeonSiegeCC — development source v0.3.7
+# DungeonSiegeCC — development source v0.3.8
 
 **This repository does not yet produce playable custom MMD companions for Dungeon Siege II.** The editor, source export, GAS template staging and bootstrap installation are implemented. The game's proprietary ASP/PRS conversion and map placement / recruitment runtime are not. Do not distribute as a finished companion framework.
 
@@ -30,6 +30,34 @@ not a playable Dungeon Siege II companion runtime.
 5. If framework files are missing/damaged, accept the **scaffold** installation; these are not in-game gameplay files.
 
 The game path is saved under `%APPDATA%\DungeonSiegeCC\settings.json`. Character files are not removed during framework repair.
+
+## Experimental .ds2res Tank packing (v0.3.8)
+
+This release integrates the **Tank packing format** independently, based on
+the public MIT-licensed source of
+[DS2 Tank Editor by PartakithRC1](https://github.com/PartakithRC1/TankEditor)
+([Nexus page](https://www.nexusmods.com/dungeonsiegeii/mods/177)).
+The Nexus executable and other mod assets are **not bundled or redistributed**.
+See `THIRD_PARTY_NOTICES.md` for attribution.
+
+Select **Pack loose DS2 resources (experimental)** in the importer, choose
+a folder containing user-authored game resource files (for instance,
+`game_overlay` created during source export), and save to a NEW `.ds2res`
+filename. The program serializes a DS2 Tank v1.1.0 header, directory and
+file indexes, checksums and RAW file payloads. It immediately re-reads the
+output with `ds2_tank.Tank` and compares all extracted bytes to the input.
+The original source tree, game resources and unrelated mods remain untouched.
+
+The packer does not convert PMX models to skinned ASP or VMD motions to PRS,
+create NPC map placements or implement recruitable NPC behavior. **A passing
+Tank round-trip test does not prove the game accepts the archive.**
+Validate experimental output with DS2 Tank Editor and an isolated test
+installation before moving it into a live mod folder. Compressed packing
+is not yet supported.
+
+Only printable ASCII resource path components are supported, and archives
+are limited to 1 GiB with conservative file limits. Symlinks and overwriting
+existing `.ds2res` files are rejected.
 
 ## Humanoid donor filtering for Dalvi (v0.3.7)
 
@@ -191,7 +219,7 @@ At startup and when manually requested, the source installer checks the latest G
 ## Automated tests
 
 ```powershell
-py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py logic_inspector.py
+py -3 -m py_compile importer.py manager.py update_helper.py mmd_assets.py game_pipeline.py asset_probe.py ds2_tank.py logic_inspector.py ds2_tank_writer.py
 py -3 -m unittest discover -s tests -v
 ```
 
