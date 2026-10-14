@@ -8,6 +8,7 @@ import game_pipeline
 import asset_probe
 import ds2_tank
 import logic_inspector
+import ds2_tank_writer
 
 SLOTS = ["default_stance","fight_stance","idle","walk","run","melee_attack","ranged_attack","spell_cast","hit","death"]
 def new_project():
@@ -102,6 +103,7 @@ class App(tk.Tk):
         inspectbar=ttk.Frame(root);inspectbar.pack(fill="x")
         ttk.Button(inspectbar,text="Inspect MMD model",command=self.inspect_model).pack(side="left",padx=3)
         ttk.Button(inspectbar,text="Inspect VMD overrides",command=self.inspect_motion).pack(side="left",padx=3)
+        ttk.Button(inspectbar,text="Pack loose DS2 resources (experimental)",command=self.pack_resource_tank).pack(side="left",padx=3)
         ttk.Button(inspectbar,text="Analyze Logic reference ZIP",command=self.inspect_logic_zip).pack(side="left",padx=3)
         info=ttk.LabelFrame(root,text="Companion",padding=8);info.pack(fill="x");info.columnconfigure(1,weight=1)
         for i,(key,title) in enumerate([("name","Name"),("identifier","Unique ID"),("model","MMD model (.pmx/.pmd)"),("class_note","Class"),("recruitment_dialogue","Recruitment dialogue"),("spawn_note","Spawn location note"),("donor_template","DS2 donor actor ID"),("donor_root","Extracted Logic GAS folder")]):
@@ -250,6 +252,47 @@ class App(tk.Tk):
             except Exception as exc:
                 reports.append(f"{slot}: ERROR — {exc}")
         messagebox.showinfo("VMD motion inspection","\\n".join(reports).replace("\\\\n","\\n"))
+
+    def pack_resource_tank(self):
+        """Build a DS2 tank container, not a complete character conversion."""
+        source=filedialog.askdirectory(
+            title="Select a folder of loose DS2 game resources (e.g. exported game_overlay)")
+        if not source:
+            return
+        path=filedialog.asksaveasfilename(
+            title="Save experimental DS2 tank",
+            defaultextension=".ds2res",
+            filetypes=[("Dungeon Siege II resources","*.ds2res")])
+        if not path:
+            return
+        target=Path(path)
+        if target.exists():
+            messagebox.showerror("Existing tank", "Choose a new filename; existing tanks cannot be overwritten.")
+            return
+        if not messagebox.askyesno(
+                "Experimental tank packing",
+                "This packs the provided loose files into a .ds2res container "
+                "with read-back verification. It does NOT generate ASP/PRS models "
+                "or guarantee that a custom companion is playable. Continue?"):
+            return
+        self.status.set("Packaging local DS2 resource tank...")
+        import threading
+        def worker():
+            try:
+                result=ds2_tank_writer.pack_directory(source,target)
+                def finish():
+                    self.status.set("Generated tank: "+str(target))
+                    messagebox.showinfo(
+                        "Tank packing complete",
+                        f"Created: {target}\nFiles: {result['files']}\n"
+                        "Read-back verification: passed.\n"
+                        "Game compatibility: NOT TESTED.\n"
+                        "Original Dungeon Siege II archives are untouched.")
+                self.after(0,finish)
+            except Exception as exc:
+                message=str(exc)
+                self.after(0,lambda:messagebox.showerror("Tank packing failed",message))
+        threading.Thread(target=worker,daemon=True).start()
 
     def inspect_logic_zip(self):
         """Analyze user-owned GAS templates inside a ZIP without unpacking them."""
