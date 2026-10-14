@@ -28,7 +28,9 @@ class TankBuildError(ValueError):
 
 
 def _name(text):
-    if not text or text in (".", "..") or any(x in text for x in "/\\:\0"):
+    if text == "":
+        return bytes(4)  # Only the root directory uses an empty NSTRING.
+    if text in (".", "..") or any(x in text for x in "/\\:\0"):
         raise TankBuildError("Invalid tank entry name: " + repr(text))
     try:
         encoded = text.encode("ascii")
