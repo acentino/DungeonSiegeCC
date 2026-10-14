@@ -49,9 +49,9 @@ def _windows_filetime(path):
 def _header(data_offset, dir_offset, file_offset, index_size, index_crc, data_crc):
     """Produce a DSg2 Tank v1.1.0 header and 16-byte raw header pad."""
     now = dt.datetime.now(dt.timezone.utc)
-    systemtime = struct.pack("<8H", now.year, (now.weekday() + 1) % 7,
-                             now.day, now.month, now.hour, now.minute,
-                             now.second, now.microsecond // 1000)
+    systemtime = struct.pack("<8H", now.year, now.month,
+                             (now.weekday() + 1) % 7, now.day, now.hour,
+                             now.minute, now.second, now.microsecond // 1000)
     header = bytearray()
     header.extend(b"DSg2Tank")
     header.extend(struct.pack("<5I", 0x00010100, dir_offset, file_offset,
